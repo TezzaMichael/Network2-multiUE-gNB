@@ -10,14 +10,18 @@ from mininet.log import info, setLogLevel
 from mininet.node import Controller
 
 from python_modules.Open5GS   import Open5GS
+import sys
+sys.path.append('/home/ubuntu/Network2-multiUE-gNB/python_modules/')
+from createJson import getJson
 
+sys.path.append('/home/ubuntu/Network2-multiUE-gNB/ueransim/config/')
+from createUE import getYaml
 import json, time
 
 if __name__ == "__main__":
-    nUE = 0
-    while nUE < 1 and nUE > 11:
-        nUE = input("Inserisci il numero di UE(2-10: ")
-    
+    nUE = sys.argv[1]  # Cli parameter
+    nUE = int(nUE)
+    getYaml(nUE)
     AUTOTEST_MODE = os.environ.get("COMNETSEMU_AUTOTEST_MODE", 0)
 
     setLogLevel("info")
@@ -168,14 +172,13 @@ if __name__ == "__main__":
 
     info("*** Adding UE\n")
     array = []
-    for i in range(nUE):
+    for i in range(1, nUE+1):
         env["COMPONENT_NAME"]= f"ue{i}"
         array.append(net.addDockerHost(
-            "ue{i}", 
+            f"ue{i}", 
             dimage="myueransim_v3-2-6",
             ip=f"192.168.0.{132+i}/24",
-            # dcmd="",
-            dcmd="bash /mnt/ueransim/open5gs_ue_init.sh",
+            dcmd=f"bash /mnt/ueransim/open5gs_ue_init.sh {i}",
             docker_args={
                 "environment": env,
                 "volumes": {
@@ -220,15 +223,19 @@ if __name__ == "__main__":
     net.addLink(upf_mec, s2, bw=1000, delay="1ms", intfName1="upf_mec-s2", intfName2="s2-upf_mec")
     
     for i in range(nUE):
-        net.addLink(array[i],  s1, bw=1000, delay="1ms", intfName1=f"ue{i}-s1",  intfName2=f"s1-ue{i}")
+        net.addLink(array[i],  s1, bw=1000, delay="1ms", intfName1=f"ue{i+1}-s1",  intfName2=f"s1-ue{i+1}")
+
     net.addLink(gnb, s1, bw=1000, delay="1ms", intfName1="gnb-s1", intfName2="s1-gnb")
     
     print(f"*** Open5GS: Init subscriber for UE 0")
     o5gs   = Open5GS( "172.17.0.2" ,"27017")
     o5gs.removeAllSubscribers()
-    with open( prj_folder + "/python_modules/subscriber_profile.json" , 'r') as f:
+    data = getJson(nUE)
+    
+    with open( prj_folder + "/python_modules/subscribers.json" , 'r') as f:
         data = json.load( f )
-
+    
+    #json_data = json.loads(data)
     if "subscribers" in data:
         subscribers = data["subscribers"]
         n = 0
