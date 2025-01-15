@@ -1,6 +1,11 @@
 
 def getYaml(nUE):
     for i in range(1, nUE+1):
+        # TODO: dividere gli UE in modo pari tra i gNB
+        if i == 1 or i == 2:
+            ipfinal= "131"
+        else:
+            ipfinal= "132"
         yaml = f"""
  # IMSI number of the UE. IMSI = [MCC|MNC|MSISDN] (In total 15 or 16 digits)
  supi: 'imsi-0010112345678{i:02d}'
@@ -24,7 +29,7 @@ def getYaml(nUE):
  
  # List of gNB IP addresses for Radio Link Simulation
  gnbSearchList:
-   - 192.168.0.131
+   - 192.168.0.{ipfinal}
  
  # UAC Access Identities Configuration
  uacAic:

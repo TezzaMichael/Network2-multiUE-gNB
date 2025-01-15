@@ -2,4 +2,4 @@
 
 
 sleep 20
-./nr-gnb -c /mnt/ueransim/open5gs-gnb.yaml > /mnt/log/gnb.log 2>&1
+./nr-gnb -c "/mnt/ueransim/open5gs_gnb$1.yaml" > "/mnt/log/gnb$1.log" 2>&1

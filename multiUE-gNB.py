@@ -11,22 +11,26 @@ from mininet.node import Controller
 
 from python_modules.Open5GS   import Open5GS
 import sys
-sys.path.append('/home/ubuntu/Network2-multiUE-gNB/python_modules/')
+sys.path.append('/home/ubuntu/Network2-multiUE-gNB1/python_modules/')
 from createJson import getJson
 
-sys.path.append('/home/ubuntu/Network2-multiUE-gNB/ueransim/config/')
+sys.path.append('/home/ubuntu/Network2-multiUE-gNB1/ueransim/config/')
 from createUE import getYaml
+from creategNB import getYamlgNB
 import json, time
+import math
 
 if __name__ == "__main__":
     nUE = sys.argv[1]  # Cli parameter
     nUE = int(nUE)
+    ngNB = math.ceil(nUE/3)
     getYaml(nUE)
+    getYamlgNB(ngNB)
     AUTOTEST_MODE = os.environ.get("COMNETSEMU_AUTOTEST_MODE", 0)
 
     setLogLevel("info")
 
-    prj_folder="/home/ubuntu/Network2-multiUE-gNB"
+    prj_folder="/home/ubuntu/Network2-multiUE-gNB1"
     mongodb_folder="/home/ubuntu/mongodbdata"
 
     env = dict()
@@ -137,38 +141,40 @@ if __name__ == "__main__":
     )
 
     info("*** Adding gNB\n")
-    env["COMPONENT_NAME"]="gnb"
-    gnb = net.addDockerHost(
-        "gnb", 
-        dimage="myueransim_v3-2-6",
-        ip="192.168.0.131/24",
-        # dcmd="",
-        dcmd="bash /mnt/ueransim/open5gs_gnb_init.sh",
-        docker_args={
-            "environment": env,
-            "volumes": {
-                prj_folder + "/ueransim/config": {
-                    "bind": "/mnt/ueransim",
-                    "mode": "rw",
+    array1 = []
+    for i in range(1, ngNB+1):
+        env["COMPONENT_NAME"]=f"gnb{i}"
+        array1.append(net.addDockerHost(
+            f"gnb{i}", 
+            dimage="myueransim_v3-2-6",
+            ip=f"192.168.0.{130+i}/24",
+            # dcmd="",
+            dcmd=f"bash /mnt/ueransim/open5gs_gnb_init.sh {i}",
+            docker_args={
+                "environment": env,
+                "volumes": {
+                    prj_folder + "/ueransim/config": {
+                        "bind": "/mnt/ueransim",
+                        "mode": "rw",
+                    },
+                    prj_folder + "/log": {
+                        "bind": "/mnt/log",
+                        "mode": "rw",
+                    },
+                    "/etc/timezone": {
+                        "bind": "/etc/timezone",
+                        "mode": "ro",
+                    },
+                    "/etc/localtime": {
+                        "bind": "/etc/localtime",
+                        "mode": "ro",
+                    },
+                    "/dev": {"bind": "/dev", "mode": "rw"},
                 },
-                prj_folder + "/log": {
-                    "bind": "/mnt/log",
-                    "mode": "rw",
-                },
-                "/etc/timezone": {
-                    "bind": "/etc/timezone",
-                    "mode": "ro",
-                },
-                "/etc/localtime": {
-                    "bind": "/etc/localtime",
-                    "mode": "ro",
-                },
-                "/dev": {"bind": "/dev", "mode": "rw"},
+                "cap_add": ["NET_ADMIN"],
+                "devices": "/dev/net/tun:/dev/net/tun:rwm"
             },
-            "cap_add": ["NET_ADMIN"],
-            "devices": "/dev/net/tun:/dev/net/tun:rwm"
-        },
-    )
+        ))
 
     info("*** Adding UE\n")
     array = []
@@ -177,7 +183,7 @@ if __name__ == "__main__":
         array.append(net.addDockerHost(
             f"ue{i}", 
             dimage="myueransim_v3-2-6",
-            ip=f"192.168.0.{132+i}/24",
+            ip=f"192.168.0.{139+i}/24",
             dcmd=f"bash /mnt/ueransim/open5gs_ue_init.sh {i}",
             docker_args={
                 "environment": env,
@@ -224,13 +230,13 @@ if __name__ == "__main__":
     
     for i in range(nUE):
         net.addLink(array[i],  s1, bw=1000, delay="1ms", intfName1=f"ue{i+1}-s1",  intfName2=f"s1-ue{i+1}")
-
-    net.addLink(gnb, s1, bw=1000, delay="1ms", intfName1="gnb-s1", intfName2="s1-gnb")
+    for i in range(ngNB):
+        net.addLink(array1[i], s1, bw=1000, delay="1ms", intfName1=f"gnb{i+1}-s1", intfName2=f"s1-gnb{i+1}")
     
-    print(f"*** Open5GS: Init subscriber for UE 0")
+    print(f"*** Open5GS: Init subscriber for UE")
     o5gs   = Open5GS( "172.17.0.2" ,"27017")
     o5gs.removeAllSubscribers()
-    data = getJson(nUE)
+    getJson(nUE)
     
     with open( prj_folder + "/python_modules/subscribers.json" , 'r') as f:
         data = json.load( f )
