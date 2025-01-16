@@ -27,8 +27,8 @@ def getJson(nUE):
                     "pcc_rule": [],
                     "ambr": {
                         "Comment": "unit=2 ==> Mbps",
-                        "uplink":   {"value": 2, "unit": 2},
-                        "downlink": {"value": 2, "unit": 2}
+                        "uplink":   {"value": 5*i, "unit": 2},
+                        "downlink": {"value": 5*i, "unit": 2}
                     },
                     "qos": {
                         "index": 8,
@@ -52,8 +52,8 @@ def getJson(nUE):
                     "pcc_rule": [],
                     "ambr": {
                         "Comment": "unit=2 ==> Mbps",
-                        "uplink":   {"value": 10, "unit": 2},
-                        "downlink": {"value": 10, "unit": 2}
+                        "uplink":   {"value": 40 +10*i, "unit": 2},
+                        "downlink": {"value": 40 +10*i, "unit": 2}
                     },
                     "qos": {
                         "index": 8,
