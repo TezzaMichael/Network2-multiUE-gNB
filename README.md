@@ -14,12 +14,13 @@ The goal is to simulate a flexible and scalable 5G network that adapts to differ
 
 ### 1. **Dynamic UE and gNB Allocation**  
 - The user specifies the desired number of UEs as an input.  
-- The system calculates the number of gNBs required based on the rule: Number of gNBs = ⌈Number of UEs / 3⌉
-(where `⌈x⌉` represents rounding up).  
+- The system calculates the number of gNBs required based on the rule:
+ **Number of gNBs** = ⌈Number of UEs / 3⌉
+ (where `⌈x⌉` represents rounding up).  
 
-- For example:
-- 5 UEs → 2 gNBs (3 UEs on the first gNB, 2 on the second).  
-- 10 UEs → 4 gNBs.  
+ For example:
+ 5 UEs → 2 gNBs (3 UEs on the first gNB, 2 on the second).  
+ 10 UEs → 4 gNBs.  
 
 ### 2. **Balanced Distribution of UEs**  
 - UEs are evenly distributed among the gNBs to ensure balanced load distribution.  
@@ -27,11 +28,11 @@ The goal is to simulate a flexible and scalable 5G network that adapts to differ
 ### 3. **Network Architecture**  
 The simulated network includes the following components:  
 - **5G Core**:  
-- AMF, SMF, UPF, and other core components for signaling and data traffic management.  
+  AMF, SMF, UPF, and other core components for signaling and data traffic management.  
 - **gNodeBs (gNBs)**:  
-- Serve as radio access points connecting UEs to the 5G core.  
+  Serve as radio access points connecting UEs to the 5G core.  
 - **User Equipment (UEs)**:  
-- Simulates end-user devices connected to the network.  
+  Simulates end-user devices connected to the network.  
 
 ### 4. **Support for Mobility**  
 - The simulation can model scenarios where UEs and gNBs move dynamically, testing coverage and handover scenarios.  
@@ -48,8 +49,8 @@ The simulated network includes the following components:
  The user specifies the number of UEs.  
 
 2. **gNB Calculation**:  
- The script computes the required number of gNBs using the formula: Number of gNBs = ⌈Number of UEs / 3⌉
-
+ The script computes the required number of gNBs using the formula:
+ **Number of gNBs** = ⌈Number of UEs / 3⌉
 
 3. **Network Creation**:  
 - The system creates the necessary gNBs and UEs.  
