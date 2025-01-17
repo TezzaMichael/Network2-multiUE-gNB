@@ -2,7 +2,7 @@ import time
 import sys
 import json
 
-def getJson(nUE):
+def generate_json(nUE):
     data = {
         "subscribers": []
     }
@@ -90,4 +90,4 @@ def getJson(nUE):
 
 
 if __name__ == "__main__":
-    getJson(10)
+    generate_json(10)

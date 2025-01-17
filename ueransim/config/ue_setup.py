@@ -1,8 +1,6 @@
-
-def getYaml(nUE, gnNB):
+def generate_yaml(nUE, gnNB):
     for i in range(1, nUE+1):
         ipfinal = str(131 + (i-1) % gnNB)
-        #print("ue" + str(i) + "-----> gnb" + ipfinal) 
         yaml = f"""
  # IMSI number of the UE. IMSI = [MCC|MNC|MSISDN] (In total 15 or 16 digits)
  supi: 'imsi-0010112345678{i:02d}'
@@ -95,4 +93,4 @@ def getYaml(nUE, gnNB):
 
 
 if __name__ == '__main__':
-  getYaml(11, 3)
+    generate_yaml(11, 3)

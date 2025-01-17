@@ -1,5 +1,4 @@
-
-def getYamlgNB(ngNB):
+def generate_yaml(ngNB):
     for i in range(1, ngNB+1):
         yaml = f"""
 mcc: '001'         # Mobile Country Code value
@@ -29,8 +28,6 @@ slices:
 ignoreStreamIds: true
 """
 
-
-
         file = open(f"./ueransim/config/open5gs_gnb{i}.yaml", "w")
         file.write(yaml)
         file.close()
@@ -39,4 +36,4 @@ ignoreStreamIds: true
 
 
 if __name__ == '__main__':
-  getYamlgNB(6)
+    generate_yaml(6)

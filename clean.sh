@@ -10,6 +10,10 @@ if [ "$1" == "log" ]; then
     cd log && sudo rm *.log 
 fi
 
+# Delete all generated files 
+rm ueransim/config/open5gs*.yaml
+rm python_modules/subscribers.json
+
 sudo ip link delete s1-ue
 sudo ip link delete s2-s3
 sudo ip link delete s2-s1
