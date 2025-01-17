@@ -11,12 +11,12 @@ from mininet.node import Controller
 
 from python_modules.Open5GS   import Open5GS
 import sys
-sys.path.append('/home/ubuntu/Network2-multiUE-gNB1/python_modules/')
-from createJson import getJson
+# sys.path.append('/home/ubuntu/Network2-multiUE-gNB1/python_modules/')
+from python_modules.createJson import getJson
 
-sys.path.append('/home/ubuntu/Network2-multiUE-gNB1/ueransim/config/')
-from createUE import getYaml
-from creategNB import getYamlgNB
+# sys.path.append('/home/ubuntu/Network2-multiUE-gNB1/ueransim/config/')
+from ueransim.config.createUE import getYaml
+from ueransim.config.creategNB import getYamlgNB
 import json, time
 import math
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     nUE = sys.argv[1]  # Cli parameter
     nUE = int(nUE)
     ngNB = math.ceil(nUE/3)
-    getYaml(nUE)
+    getYaml(nUE, ngNB)
     getYamlgNB(ngNB)
     AUTOTEST_MODE = os.environ.get("COMNETSEMU_AUTOTEST_MODE", 0)
 
