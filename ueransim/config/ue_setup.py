@@ -1,6 +1,9 @@
-
+def generate_yaml(nUE, gnNB):
+    for i in range(1, nUE+1):
+        ipfinal = str(131 + (i-1) % gnNB)
+        yaml = f"""
  # IMSI number of the UE. IMSI = [MCC|MNC|MSISDN] (In total 15 or 16 digits)
- supi: 'imsi-001011234567801'
+ supi: 'imsi-0010112345678{i:02d}'
  # Mobile Country Code value of HPLMN
  mcc: '001'
  # Mobile Network Code value of HPLMN (2 or 3 digits)
@@ -15,13 +18,13 @@
  # Authentication Management Field (AMF) value
  amf: '8000'
  # IMEI number of the device. It is used if no SUPI is provided
- imei: '356938035643801'
+ imei: '3569380356438{i:02d}'
  # IMEISV number of the device. It is used if no SUPI and IMEI is provided
- imeiSv: '4370816125816101'
+ imeiSv: '43708161258161{i:02d}'
  
  # List of gNB IP addresses for Radio Link Simulation
  gnbSearchList:
-   - 192.168.0.131
+   - 192.168.0.{ipfinal}
  
  # UAC Access Identities Configuration
  uacAic:
@@ -80,4 +83,14 @@
  integrityMaxRate:
    uplink: 'full'
    downlink: 'full'
-        
+        """
+
+        file = open(f"./ueransim/config/open5gs_ue{i}.yaml", "w")
+        file.write(yaml)
+        file.close()
+
+    return 
+
+
+if __name__ == '__main__':
+    generate_yaml(11, 3)

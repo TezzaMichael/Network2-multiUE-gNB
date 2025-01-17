@@ -1,0 +1,7 @@
+__pycache__
+*.swp
+log
+
+# File created dynamically
+ueransim/config/open5gs*.yaml
+python_modules/subscribers.json
