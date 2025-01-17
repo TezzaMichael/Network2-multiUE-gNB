@@ -4,4 +4,4 @@ log
 
 # File created dynamically
 ueransim/config/open5gs*.yaml
-python_modules/subscriber.json
+python_modules/subscribers.json
