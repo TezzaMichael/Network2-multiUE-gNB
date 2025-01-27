@@ -42,3 +42,4 @@ sudo ip link delete gnb3-s1
 sudo ip link delete s3-cp
 sudo ip link delete s2-upf_mec
 sudo ip link delete s3-upf
+sudo ip link delete s3-mec_server

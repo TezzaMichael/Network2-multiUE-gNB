@@ -132,6 +132,39 @@ def instantiate_upf_mec():
     
     return upf_mec
 
+def instantiate_mec_server():
+    info("*** Adding MEC SERVER\n")
+    env["COMPONENT_NAME"]="mec_server"
+    mec_server = net.addDockerHost(
+        "mec_server", 
+        dimage="mec_server",
+        ip="192.168.0.135/24",
+        dcmd="bash /mnt/mec_server/mec_server.sh",
+        docker_args={
+            "environment": env,
+            "volumes": {
+                prj_folder + "/mec_server": {
+                    "bind": "/mnt/mec_server",
+                    "mode": "rw",
+                },
+                prj_folder + "/log": {
+                    "bind": "/mnt/log",
+                    "mode": "rw",
+                },
+                "/etc/timezone": {
+                    "bind": "/etc/timezone",
+                    "mode": "ro",
+                },
+                "/etc/localtime": {
+                    "bind": "/etc/localtime",
+                    "mode": "ro",
+                },
+            },
+            "cap_add": ["NET_ADMIN"],
+        },
+    )
+    return mec_server
+
 
 def instantiate_gnbs(ngNB):
     info("*** Adding gNB\n")
@@ -230,7 +263,6 @@ def add_subscribers(nUE):
     else:
         info(f"*** Open5GS: No subscribers found")
 
-
 if __name__ == "__main__":
     nUE = int(sys.argv[1])  # Cli parameter
     ngNB = math.ceil(nUE/3)
@@ -255,6 +287,7 @@ if __name__ == "__main__":
     cp = instantiate_cp()
     upf_cld = instantiate_upf_cld()
     upf_mec = instantiate_upf_mec()
+    mec_server = instantiate_mec_server()
     gnb_list = instantiate_gnbs(ngNB)
     ue_list = instantiate_ues(nUE)
 
@@ -279,6 +312,8 @@ if __name__ == "__main__":
     for i in range(ngNB):
         net.addLink(gnb_list[i], s1, bw=1000, delay="1ms", intfName1=f"gnb{i+1}-s1", intfName2=f"s1-gnb{i+1}")
     
+    net.addLink(mec_server, s3, bw=1000, delay="5ms", intfName1="mec_server-s3", intfName2="s3-mec_server")
+
     print(f"*** Open5GS: Init subscriber for UE")
     o5gs   = Open5GS( "172.17.0.2" ,"27017")
     o5gs.removeAllSubscribers()

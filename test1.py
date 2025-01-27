@@ -55,44 +55,43 @@ if __name__ == '__main__':
                 upf_to_ip_map[upf_name] = ip
 
     # Enter in every upf and start the server 
-    print("Starting servers")
-    base_port = 6000
+    print("Starting server")
     for i, upf_name in enumerate(upf_to_ip_map.keys()):
         # Kill the server if there's one
         command = f"docker exec {upf_name} pkill -2 -f iperf3"
         subprocess.run(command, shell=True, universal_newlines=True)
         # Start the server
-        command = f"docker exec {upf_name} iperf3 -s -p {base_port+i}"
+        command = f"docker exec {upf_name} iperf3 -s"
         subprocess.Popen(command, shell=True, universal_newlines=True)
 
-    # For every ue test the bandwidth versus the gnb
-    print("Running tests")
-    for i in range(nUE):
-        ue_name = f"ue{i+1}"
-        interfaces = get_interface(ue_name)
-
-        for interface in interfaces:
-            if not interface.startswith("uesimtun"):
-                continue
+        print("Iterating over the list of UE")
+        for i in range(nUE):
+            ue_name = f"ue{i+1}"
 
             dest_ip = None
-            dest_port = None
             interface_ip = None
-            if interface == "uesimtun0":  # upf_mec
-                dest_ip = upf_to_ip_map["upf_mec"]
-                dest_port = 6000
-                interface_ip = get_ip(ue_name, interface)
-            elif interface == "uesimtun1":  # upf_cld
-                dest_ip = upf_to_ip_map["upf_cld"]
-                dest_port = 6001
-                interface_ip = get_ip(ue_name, interface)
+            interface_name = None
 
-            command = f"docker exec ue{i+1} iperf3 -c {dest_ip} -p {dest_port} -B {interface_ip} -t 15"
-            output = subprocess.run(command, shell=True, universal_newlines=True)
+            interfaces = get_interface(ue_name)
+            
+            for interface in interfaces:
+                if upf_name == "upf_mec" and interface == "uesimtun1":  
+                    dest_ip = upf_to_ip_map["upf_mec"]
+                    interface_ip = get_ip(ue_name, interface)
+                    interface_name = interface
+                elif upf_name == "upf_cld" and interface == "uesimtun0":  # upf_cld
+                    dest_ip = upf_to_ip_map["upf_cld"]
+                    interface_ip = get_ip(ue_name, interface)
+                    interface_name = interface
+            
+            if not dest_ip or not interface_ip:
+                continue
+                
+            print(f"{ue_name}:{interface_name} --> {upf_name}")
+            command = f"docker exec {ue_name} iperf3 -c {dest_ip} -B {interface_ip} -t 5"
+            output = subprocess.check_output(command, shell=True, universal_newlines=True)
             print(output)
     
-    # Close the servers
-    print("Stopping servers")
-    for upf_name in upf_to_ip_map.keys():
+        print("Stopping the server")
         command = f"docker exec {upf_name} pkill -2 -f iperf3"
         output = subprocess.run(command, shell=True, universal_newlines=True)
