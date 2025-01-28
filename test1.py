@@ -62,7 +62,7 @@ if __name__ == '__main__':
         subprocess.run(command, shell=True, universal_newlines=True)
         # Start the server
         command = f"docker exec {upf_name} iperf3 -s"
-        subprocess.Popen(command, shell=True, universal_newlines=True)
+        subprocess.Popen(command, shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         print("Iterating over the list of UE")
         for i in range(nUE):
@@ -87,10 +87,17 @@ if __name__ == '__main__':
             if not dest_ip or not interface_ip:
                 continue
                 
-            print(f"{ue_name}:{interface_name} --> {upf_name}")
-            command = f"docker exec {ue_name} iperf3 -c {dest_ip} -B {interface_ip} -t 5"
-            output = subprocess.check_output(command, shell=True, universal_newlines=True)
-            print(output)
+            command = ["docker", "exec", ue_name, "iperf3", "-c", dest_ip, "-B", interface_ip, "-t", "5"]
+            result = subprocess.run(command, capture_output=True, text=True)
+
+            final_result = []
+            lines = reversed(result.stdout.splitlines())
+            for line in lines:
+                final_result.append(line + "\n")
+                if line.startswith("[ ID]"):
+                    break
+
+            print("".join(reversed(final_result)))
     
         print("Stopping the server")
         command = f"docker exec {upf_name} pkill -2 -f iperf3"
