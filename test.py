@@ -2,6 +2,22 @@ from python_modules.Open5GS import Open5GS
 import math
 import subprocess
 import re
+import time
+import signal
+import argparse
+import textwrap
+class Network:
+    def __init__(self, ue_list, gnb_list, upf_mec, upf_cld, cp, mec_server):
+        self.ue_list = ue_list
+        self.gnb_list = gnb_list
+        self.upf_mec = upf_mec
+        self.upf_cld = upf_cld
+        self.cp = cp
+        self.mec_server = mec_server
+
+    def __str__(self):
+        return "TODO"
+
 
 class Component:
 
@@ -34,7 +50,7 @@ class Component:
         else:
             print(f"The interface {interface_name} does not exist.")
     
-    def show_interfaces(self):
+    def print_interfaces(self):
         """
         Prints all interfaces with their respective IPs.
         """
@@ -51,56 +67,49 @@ class Component:
         """
         return f"Component: {self.name}, Interfaces: {len(self.interfaces)}"
 
-def network(nUE, ngNB):
-    net = []
+def get_network_components(nUE, ngNB):
+    ue_list = []
     for i in range(nUE):
-        net.append( Component(name=f"ue{i+1}"))
+        ue_list.append( Component(name=f"ue{i+1}"))
         interfaces = get_interface(f"ue{i+1}")
         for interface in interfaces:
             if interface != "lo" and interface != "eth0":
                 ip =get_ip(f"ue{i+1}", interface)
-                add_interface(net, f"ue{i+1}", interface, ip)
-        print(net[i])
-        net[i].show_interfaces()
-    print('\n')
+                ue_list[i].add_interface(interface, ip)
+    gnb_list = []
     for i in range(ngNB):
-        net.append( Component(name=f"gnb{i+1}"))
+        gnb_list.append( Component(name=f"gnb{i+1}"))
         interfaces = get_interface(f"gnb{i+1}")
         for interface in interfaces:
             if interface != "lo" and interface != "eth0":
                 ip =get_ip(f"gnb{i+1}", interface)
-                add_interface(net, f"gnb{i+1}", interface, ip)
-        print(net[nUE+i])
-        net[nUE+i].show_interfaces()
-    print('\n')
-    net.append( Component(name="upf_mec"))
+                gnb_list[i].add_interface(interface, ip)
+    upf_mec = Component(name="upf_mec")
     interfaces = get_interface("upf_mec")
     for interface in interfaces:
          if interface != "lo" and interface != "eth0":
             ip =get_ip("upf_mec", interface)
-            add_interface(net, "upf_mec", interface, ip)
-    print(net[-1])
-    net[-1].show_interfaces()
-    print('\n')
-    net.append( Component(name="upf_cld"))
+            upf_mec.add_interface(interface, ip)
+    upf_cld = Component(name="upf_cld")
     interfaces = get_interface("upf_cld")
     for interface in interfaces:
         if interface != "lo" and interface != "eth0":
             ip =get_ip("upf_cld", interface)
-            add_interface(net, "upf_cld", interface, ip)
-    print(net[-1])
-    net[-1].show_interfaces()
-    print('\n')
-    net.append( Component(name="cp"))
+            upf_cld.add_interface(interface, ip)
+    cp = Component(name="cp")
     interfaces = get_interface("cp")
     for interface in interfaces:
          if interface != "lo" and interface != "eth0":
             ip =get_ip("cp", interface)
-            add_interface(net, "cp", interface, ip)
-    print(net[-1])
-    net[-1].show_interfaces()
-    print('\n')
-    return net 
+            cp.add_interface(interface, ip)
+    mec_server = Component(name="mec_server")
+    interfaces = get_interface("mec_server")
+    for interface in interfaces:
+         if interface != "lo" and interface != "eth0":
+            ip = get_ip("mec_server", interface)
+            mec_server.add_interface(interface, ip)
+
+    return (ue_list, gnb_list, upf_mec, upf_cld, cp, mec_server) 
 
 def add_interface(network_list, network_name, interface_name, interface_ip):
     for network in network_list:
@@ -108,6 +117,29 @@ def add_interface(network_list, network_name, interface_name, interface_ip):
             network.add_interface(interface_name, interface_ip)
             return
     print(f"Network with name '{network_name}' not found.")
+
+def start_tcpdump(upf,interface):
+    """Avvia tcpdump in background e stampa l'output in tempo reale."""
+    cmd = f"docker exec {upf} timeout 12 tcpdump -i {interface} -n -l"
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    return process
+
+def stop_tcpdump(process):
+    """Termina tcpdump in modo pulito."""
+    if process:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+def print_tcpdump_output(process):
+    """Legge l'output di tcpdump in tempo reale e lo stampa."""
+    try:
+        for line in iter(process.stdout.readline, ''):
+            print(line.strip())  # Stampa l'output in tempo reale
+    except KeyboardInterrupt:
+        pass
 
 def get_ip(name, interface):
     command = f"docker exec {name} ip addr show {interface}"
@@ -128,84 +160,107 @@ def get_interface(ue):
 def ping_test(container, interface, destination ):
     command = f"docker exec {container} ping -c 8 -n -I {interface} {destination}"
     ping_output = subprocess.check_output(command, shell=True, universal_newlines=True)
-    print(ping_output)
+    return ping_output #print(ping_output)
 
 def throughput_test():
     return 0
 
+def latency(network):
+    for ue in network.ue_list:
+        print(f"Test latency for {ue.name}")
+        for interface in ue.interfaces:
+            if interface == "uesimtun0":
+                print(f"-    interface: {interface}")
+                print("-    upf_cld")   
+                print(ping_test(ue.name, interface, network.upf_cld.interfaces["upf_cld-s3"]))
+            elif interface == "uesimtun1":
+                print(f"-    interface: {interface}")
+                print("-    upf_mec")
+                print(ping_test(ue.name, interface, network.upf_mec.interfaces["upf_mec-s2"]))
 
-if __name__ == '__main__':
+def bandwidth(network):
+    print("bandwidth")
+
+def routing(network):
+    for ue in network.ue_list:
+        for interface in ue.interfaces:
+            if interface not in ["uesimtun0", "uesimtun1"]:
+                continue
+
+            server_name = ""
+            if interface == "uesimtun0":
+                print("### Avvio tcpdump su upf_cld ###")
+                process1 = start_tcpdump("upf_cld", "ogstun")
+                destination = "www.google.com"
+                server_name = "upf_cld"
+            elif interface == "uesimtun1":
+                print("### Avvio tcpdump su upf_mec ###")
+                process1 = start_tcpdump("upf_mec", "ogstun")
+                destination = network.mec_server.interfaces["mec_server-s3"]
+                server_name = "upf_mec"
+
+            time.sleep(2)  # Attendi che tcpdump sia pronto
+
+            print(f"### Eseguo il ping su {ue.name}[{interface}] ###")
+            ping_test(ue.name, interface, destination)
+
+            print(f"### Output tcpdump {server_name} ###")
+            print_tcpdump_output(process1)
+
+            print(f"### Arresto tcpdump {server_name} ###")
+            stop_tcpdump(process1)
+
+            time.sleep(2)
+
+def details(network):
+    print(network)
+
+def main():
+    # Creazione del parser degli argomenti
+    parser = argparse.ArgumentParser(
+        description="Un programma di esempio per gestire comandi da riga di comando.",
+        formatter_class=argparse.RawTextHelpFormatter,  # Permette di formattare l'help in modo più leggibile
+        epilog=textwrap.dedent("""\
+        Comandi disponibili per l'opzione -c/--command:
+          details    Stampa i dettagli della rete
+          latency    Misura la latenza della rete.
+          bandwidth  Misura la banda disponibile.
+          routing    Visualizza il percorso che i pacchetti percorrono
+        """)
+    )
+    
+    parser.add_argument(
+        "-c", "--command", 
+        type=str, 
+        help="Esegui un comando specifico. Usa '-h' per vedere la lista completa."
+    )
+    args = parser.parse_args()
+
+    command_function = None
+    if args.command == "latency":
+        command_function = latency
+    elif args.command == "bandwidth":
+        command_function = bandwidth
+    elif args.command == "routing":
+        command_function = routing
+    elif args.command == "details":
+        command_function = details
+    elif args.command:
+        print(f"Comando '{args.command}' non riconosciuto.\n")
+        parser.print_help()
+        return
+    else:
+        # Mostra l'aiuto se non viene passato nessun comando
+        parser.print_help()
+        return
+
     O5GS = Open5GS( "172.17.0.2" ,"27017")
     subscribers = O5GS._GetSubscribers()
     nUE = len(subscribers)
     ngNB = math.ceil(nUE/3)
-    print(f"TESTING NETWORK 5G UE: {nUE} GNB: {ngNB}")
-    print("--------- SHOW DETAILS ----------")   
-    net = network(nUE, ngNB)
-    print("----------------------------------")
-    #########################################
-    # PING TEST
-    print("-------- LATENCY TEST ---------")
-    get_interface("gnb1")
-    get_ip("gnb1", "gnb1-s1")
-    
-    for i in range(nUE) :
-        print(f"Test ping for ue{i+1}")
-        interfaces = get_interface(f"ue{i+1}")[3:]
-        for interface in interfaces:
-            print(f"-    interface: {interface}")
-            if interface == "uesimtun0":
-                print("-    upf_cld")
-                ip_upf = get_ip(f"upf_cld", get_interface("upf_cld")[3])
-                ping_test(f"ue{i+1}", interface, ip_upf)
-            else:
-                print("-    upf_mec")
-                ip_upf = get_ip(f"upf_mec", get_interface("upf_mec")[3])
-                ping_test(f"ue{i+1}", interface, ip_upf)    
-    print("--------------------------------------------")
-    #########################################
-    # BANDWIDTH TEST
-    print("---------- BANDWIDTH TEST -----------------")
-    #docker exec {ue} iperf3 -c {destination} -B {interface_ip} -t 15
-    for i in range(nUE):
-        ue = f"ue{i+1}"
-        destination = "192.168.1.112" #113
-        interface_ip = get_ip(ue, "uesimtun0")
-        command = f"docker exec {ue} iperf3 -c {destination} -B {interface_ip} -t 15"
-        test = subprocess.check_output(command, shell=True, universal_newlines=True)
-        print(test)
+    network = Network(*get_network_components(nUE, ngNB))
 
-    # Get the ip for every gnb
-    gnb_map = {}
-    for i in range(ngNB) :
-        gnb_name = f"gnb{i+1}"
-        interfaces = get_interface(gnb_name)
-        
-        for interface in interfaces:
-            if interface.startswith(gnb_name):
-                ip = get_ip(gnb_name, interface)
-                gnb_map[gnb_name] = ip
+    command_function(network)
 
-
-    # Enter in every gnb and start listening for new connections
-    base_port = 6000
-    for i, gnb_name in enumerate(gnb_map.keys()):
-        command = f"docker exec {gnb_name} iperf3 -s -p {base_port+i} -1"
-        subprocess.Popen(command, shell=True, universal_newlines=True)
-
-    # For every ue test the bandwidth versus the gnb
-    for i in range(nUE):
-        ue_name = f"ue{i+1}"
-        interfaces = get_interface(ue_name)
-
-        for interface in interfaces:
-            if interface.startswith(ue_name):
-                for j, gnb_ip in enumerate(gnb_map.values()):
-                    command = f"docker exec {ue_name} iperf3 -c {gnb_ip} -p {base_port+i}"
-                    config_output = subprocess.check_output(command, shell=True, universal_newlines=True)
-                    print(config_output)
-
-
-
-
-
+if __name__ == '__main__':
+    main()
