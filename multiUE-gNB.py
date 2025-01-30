@@ -138,7 +138,7 @@ def instantiate_mec_server():
     mec_server = net.addDockerHost(
         "mec_server", 
         dimage="mec_server",
-        ip="192.168.0.135/24",
+        ip="192.168.0.140/24",
         dcmd="bash /mnt/mec_server/mec_server.sh",
         docker_args={
             "environment": env,

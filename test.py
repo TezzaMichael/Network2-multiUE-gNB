@@ -97,6 +97,7 @@ class Component:
         else:
             interfaces = "The component '{self.name}' has no configured interfaces."
         return interfaces
+
     def __str__(self):
         """
         String representation of the Component object.
@@ -172,7 +173,7 @@ def print_tcpdump_output(process, ue):
             stripped_line = line.strip()  # Rimuove spazi bianchi e newline
             if ue:
                 # Controlla se l'IP 192.168.0.140 è presente nella riga
-                if ue in stripped_line:
+                if ue in stripped_line and "UDP" in stripped_line:
                     print(stripped_line)  # Stampa solo se l'IP è presente
             else:
                 print(stripped_line)  # Stampa tutte le righe se gnb è False
@@ -215,7 +216,56 @@ def latency(network):
                 print(ping_test(ue.name, interface, network.upf_mec.interfaces["upf_mec-s2"]))
 
 def bandwidth(network):
-    print("bandwidth")
+    for upf in [network.upf_mec, network.upf_cld]:
+        dest_ip = None
+        for interface in upf.interfaces:
+            if interface.startswith("upf"):
+                dest_ip = get_ip(upf.name, interface)
+
+        if dest_ip == None:
+            continue
+
+        # Enter in every upf and start the server 
+        print("Starting server")
+
+        # Kill the server if there's one
+        command = f"docker exec {upf.name} pkill -2 -f iperf3"
+        subprocess.run(command, shell=True, universal_newlines=True)
+        # Start the server
+        command = f"docker exec {upf.name} iperf3 -s"
+        subprocess.Popen(command, shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        print("Iterating over the list of UE")
+        for ue in network.ue_list:
+            interface_ip = None
+            interface_name = None
+
+            for interface in ue.interfaces:
+                if upf.name == "upf_mec" and interface == "uesimtun1":  
+                    interface_ip = get_ip(ue.name, interface)
+                    interface_name = interface
+                elif upf.name == "upf_cld" and interface == "uesimtun0":  
+                    interface_ip = get_ip(ue.name, interface)
+                    interface_name = interface
+            
+            if not interface_ip:
+                continue
+                
+            command = ["docker", "exec", ue.name, "iperf3", "-c", dest_ip, "-B", interface_ip, "-t", "5"]
+            result = subprocess.run(command, capture_output=True, text=True)
+
+            final_result = []
+            lines = reversed(result.stdout.splitlines())
+            for line in lines:
+                final_result.append(line + "\n")
+                if line.startswith("[ ID]"):
+                    break
+
+            print("".join(reversed(final_result)))
+    
+        print("Stopping the server")
+        command = f"docker exec {upf.name} pkill -2 -f iperf3"
+        output = subprocess.run(command, shell=True, universal_newlines=True)
 
 def routing(network):
     ngNB = len(network.gnb_list)
@@ -302,7 +352,7 @@ def main():
         # Mostra l'aiuto se non viene passato nessun comando
         parser.print_help()
         return
-    print("########### Network Loading ###########")
+    print("########### Loading Network ###########")
     O5GS = Open5GS( "172.17.0.2" ,"27017")
     subscribers = O5GS._GetSubscribers()
     nUE = len(subscribers)
