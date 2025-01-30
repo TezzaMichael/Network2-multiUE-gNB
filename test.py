@@ -6,7 +6,9 @@ import time
 import signal
 import argparse
 import textwrap
+
 class Network:
+
     def __init__(self, ue_list, gnb_list, upf_mec, upf_cld, cp, mec_server):
         self.ue_list = ue_list
         self.gnb_list = gnb_list
@@ -16,8 +18,41 @@ class Network:
         self.mec_server = mec_server
 
     def __str__(self):
-        return "TODO"
+        result = "Network Configuration:\n"
 
+        # Stampare gli UE
+        result += "\nUE List:\n"
+        for ue in self.ue_list:
+            result += f"{ue}\n"
+            result += ue.get_interfaces_info()
+        
+        # Stampare i gNB
+        result += "\ngNB List:\n"
+        for gnb in self.gnb_list:
+            result += f"{gnb}\n"
+            result += gnb.get_interfaces_info()
+        
+        # Stampare UPF MEC
+        result += "\nUPF MEC:\n"
+        result += f"{self.upf_mec}\n"
+        result += self.upf_mec.get_interfaces_info()
+
+        # Stampare UPF Cloud
+        result += "\nUPF Cloud:\n"
+        result += f"{self.upf_cld}\n"
+        result += self.upf_cld.get_interfaces_info()
+        
+        # Stampare CP
+        result += "\nControl Plane (CP):\n"
+        result += f"{self.cp}\n"
+        result += self.cp.get_interfaces_info()
+        
+        # Stampare MEC Server
+        result += "\nMEC Server:\n"
+        result += f"{self.mec_server}\n"
+        result += self.mec_server.get_interfaces_info()
+
+        return result
 
 class Component:
 
@@ -50,17 +85,18 @@ class Component:
         else:
             print(f"The interface {interface_name} does not exist.")
     
-    def print_interfaces(self):
+    def get_interfaces_info(self):
         """
         Prints all interfaces with their respective IPs.
         """
+        interfaces = ""
         if self.interfaces:
-            print(f"Interfaces for the component '{self.name}':")
+            interfaces += f"Interfaces for the component '{self.name}':\n"
             for interface, ip in self.interfaces.items():
-                print(f" - {interface}: {ip}")
+                interfaces += f" - {interface}: {ip}\n"
         else:
-            print(f"The component '{self.name}' has no configured interfaces.")
-
+            interfaces = "The component '{self.name}' has no configured interfaces."
+        return interfaces
     def __str__(self):
         """
         String representation of the Component object.
@@ -111,16 +147,12 @@ def get_network_components(nUE, ngNB):
 
     return (ue_list, gnb_list, upf_mec, upf_cld, cp, mec_server) 
 
-def add_interface(network_list, network_name, interface_name, interface_ip):
-    for network in network_list:
-        if network.name == network_name:  # Search for the matching name
-            network.add_interface(interface_name, interface_ip)
-            return
-    print(f"Network with name '{network_name}' not found.")
-
 def start_tcpdump(upf,interface):
     """Avvia tcpdump in background e stampa l'output in tempo reale."""
-    cmd = f"docker exec {upf} timeout 12 tcpdump -i {interface} -n -l"
+    if "s1" in interface:
+        cmd = f"docker exec {upf} timeout 4 tcpdump -i {interface} -n -l"
+    else:
+        cmd = f"docker exec {upf} timeout 12 tcpdump -i {interface} -n -l"
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     return process
 
@@ -133,11 +165,18 @@ def stop_tcpdump(process):
         except subprocess.TimeoutExpired:
             process.kill()
 
-def print_tcpdump_output(process):
+def print_tcpdump_output(process, ue):
     """Legge l'output di tcpdump in tempo reale e lo stampa."""
     try:
-        for line in iter(process.stdout.readline, ''):
-            print(line.strip())  # Stampa l'output in tempo reale
+         for line in iter(process.stdout.readline, ''):
+            stripped_line = line.strip()  # Rimuove spazi bianchi e newline
+            if ue:
+                # Controlla se l'IP 192.168.0.140 è presente nella riga
+                if ue in stripped_line:
+                    print(stripped_line)  # Stampa solo se l'IP è presente
+            else:
+                print(stripped_line)  # Stampa tutte le righe se gnb è False
+     
     except KeyboardInterrupt:
         pass
 
@@ -162,9 +201,6 @@ def ping_test(container, interface, destination ):
     ping_output = subprocess.check_output(command, shell=True, universal_newlines=True)
     return ping_output #print(ping_output)
 
-def throughput_test():
-    return 0
-
 def latency(network):
     for ue in network.ue_list:
         print(f"Test latency for {ue.name}")
@@ -182,34 +218,47 @@ def bandwidth(network):
     print("bandwidth")
 
 def routing(network):
+    ngNB = len(network.gnb_list)
+    
     for ue in network.ue_list:
+        n = int(re.search(r'(\d+)', ue.name).group(1))
+        gnb = f"gnb{(n-1)%ngNB +1}"
+        print(f"### Check rounting {ue.name} -> {gnb} ###")
+        process = start_tcpdump(gnb, f"{gnb}-s1")
+        time.sleep(2)
+        print_tcpdump_output(process, ue.interfaces[f"{ue.name}-s1"])
+        stop_tcpdump(process) 
+        
         for interface in ue.interfaces:
             if interface not in ["uesimtun0", "uesimtun1"]:
                 continue
 
-            server_name = ""
+            upf = ""
             if interface == "uesimtun0":
-                print("### Avvio tcpdump su upf_cld ###")
-                process1 = start_tcpdump("upf_cld", "ogstun")
+                print(f"### Check rounting {ue.name} -> {gnb} -> upf_cld ###")
                 destination = "www.google.com"
-                server_name = "upf_cld"
-            elif interface == "uesimtun1":
-                print("### Avvio tcpdump su upf_mec ###")
-                process1 = start_tcpdump("upf_mec", "ogstun")
-                destination = network.mec_server.interfaces["mec_server-s3"]
-                server_name = "upf_mec"
+                upf = "upf_cld"
+                routing = f"Routing: {ue.name}[{interface}] -> {gnb} -> {upf} -> {destination}"
 
+            elif interface == "uesimtun1":
+                print(f"### Check routing {ue.name} -> {gnb} -> upf_mec ###")
+                destination = network.mec_server.interfaces["mec_server-s3"]
+                upf = "upf_mec"
+                routing = f"Routing: {ue.name}[{interface}] -> {gnb} -> {upf} -> mec_server"
+        
+            process1 = start_tcpdump(f"{upf}", "ogstun")
             time.sleep(2)  # Attendi che tcpdump sia pronto
 
-            print(f"### Eseguo il ping su {ue.name}[{interface}] ###")
+            print(f"### Eseguo il ping {ue.name}[{interface}] -> {destination} ###")
             ping_test(ue.name, interface, destination)
 
-            print(f"### Output tcpdump {server_name} ###")
-            print_tcpdump_output(process1)
-
-            print(f"### Arresto tcpdump {server_name} ###")
+            print(f"### Output tcpdump {upf} ###")
+            print_tcpdump_output(process1, None)
+            
+            print(f"### Arresto tcpdump {upf} ###")
             stop_tcpdump(process1)
-
+            
+            print(routing)
             time.sleep(2)
 
 def details(network):
@@ -253,7 +302,7 @@ def main():
         # Mostra l'aiuto se non viene passato nessun comando
         parser.print_help()
         return
-
+    print("########### Network Loading ###########")
     O5GS = Open5GS( "172.17.0.2" ,"27017")
     subscribers = O5GS._GetSubscribers()
     nUE = len(subscribers)
