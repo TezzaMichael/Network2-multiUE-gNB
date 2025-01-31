@@ -2,6 +2,8 @@
 
 This project involves the creation of a dynamic 5G network using **Communetsemu**, where both **User Equipment (UE)** and **gNodeBs (gNB)** are dynamically managed. The system automatically determines the correct number of gNBs based on the user-defined number of UEs, ensuring that each gNB supports a maximum of 3 UEs.  
 
+<img src="./images/network_scheme.png" title="./images/network_scheme.png" width=800px></img>
+
 ---
 
 ## **Project Overview**  
