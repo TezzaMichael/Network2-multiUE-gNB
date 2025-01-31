@@ -216,7 +216,7 @@ def instantiate_ues(nUE):
         ue_list.append(net.addDockerHost(
             f"ue{i}", 
             dimage="myueransim_v3-2-6",
-            ip=f"192.168.0.{139+i}/24",
+            ip=f"192.168.0.{140+i}/24",
             dcmd=f"bash /mnt/ueransim/open5gs_ue_init.sh {i}",
             docker_args={
                 "environment": env,
