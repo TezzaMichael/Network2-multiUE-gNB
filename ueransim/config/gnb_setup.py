@@ -1,5 +1,34 @@
+import os
+
 def generate_yaml(ngNB):
-    for i in range(1, ngNB+1):
+    """
+    Deletes all existing 'open5gs_gnb*' files in the current directory and generates new YAML configuration files 
+    for the specified number of gNodeBs (ngNB).
+
+    This function creates a YAML configuration for each gNodeB with essential parameters like 
+    MCC (Mobile Country Code), MNC (Mobile Network Code), Cell Identity, IP addresses for different
+    interfaces (Radio Link, N2, N3), and other parameters required for the gNB setup. The configuration
+    is saved to a file for each gNodeB.
+
+    Args:
+        ngNB (int): The number of gNodeBs to generate YAML configurations for.
+
+    Returns:
+        None
+    """
+    
+    # Get the current directory where the script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Delete all existing 'open5gs_gnb*' files in the current directory
+    for file_name in os.listdir(script_dir):
+        if file_name.startswith("open5gs_gnb") and file_name.endswith(".yaml"):
+            os.remove(os.path.join(script_dir, file_name))
+            print(f"Deleted existing file: {file_name}")
+    
+    # Loop through the number of gNodeBs to create their configurations
+    for i in range(1, ngNB + 1):
+        # Generate the YAML configuration content for each gNB
         yaml = f"""
 mcc: '001'         # Mobile Country Code value
 mnc: '01'          # Mobile Network Code value (2 or 3 digits)
@@ -27,13 +56,12 @@ slices:
 # Indicates whether or not SCTP stream number errors should be ignored.
 ignoreStreamIds: true
 """
+        # Write the generated YAML configuration to a file
+        with open(f"./ueransim/config/open5gs_gnb{i}.yaml", "w") as file:
+            file.write(yaml)
 
-        file = open(f"./ueransim/config/open5gs_gnb{i}.yaml", "w")
-        file.write(yaml)
-        file.close()
-
+    # Return after completing the YAML generation
     return
 
-
 if __name__ == '__main__':
-    generate_yaml(6)
+    generate_yaml(6)  # Generate YAML for 6 gNBs
