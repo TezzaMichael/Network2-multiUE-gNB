@@ -1,34 +1,31 @@
-#! /usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import os
 
-from comnetsemu.cli import CLI, spawnXtermDocker
-from comnetsemu.net import Containernet, VNFManager
+from comnetsemu.cli import CLI
+from comnetsemu.net import Containernet
 from mininet.link import TCLink
 from mininet.log import info, setLogLevel
 from mininet.node import Controller
 
-from python_modules.Open5GS   import Open5GS
+from python_modules.Open5GS import Open5GS
 import sys
 
 import ueransim.config.ue_setup as ue_setup
 import ueransim.config.gnb_setup as gnb_setup
 import python_modules.ue_configuration as ue_configuration
-import json, time
+import json
 import math
 
 
 def instantiate_cp():
     info("*** Adding Host for open5gs CP\n")
-    env["COMPONENT_NAME"]="cp"
+    env["COMPONENT_NAME"] = "cp"
     cp = net.addDockerHost(
         "cp",
         dimage="my5gc_v2-4-4",
         ip="192.168.0.111/24",
         dcmd="bash /open5gs/install/etc/open5gs/5gc_cp_init.sh",
         docker_args={
-            "ports" : { "3000/tcp": 3000 },
+            "ports": {"3000/tcp": 3000},
             "volumes": {
                 prj_folder + "/log": {
                     "bind": "/open5gs/install/var/log/open5gs",
@@ -53,13 +50,13 @@ def instantiate_cp():
             },
         },
     )
-    
+
     return cp
 
 
 def instantiate_upf_cld():
     info("*** Adding Host for open5gs UPF\n")
-    env["COMPONENT_NAME"]="upf_cld"
+    env["COMPONENT_NAME"] = "upf_cld"
     upf_cld = net.addDockerHost(
         "upf_cld",
         dimage="my5gc_v2-4-4",
@@ -89,7 +86,7 @@ def instantiate_upf_cld():
             "cap_add": ["NET_ADMIN"],
             "sysctls": {"net.ipv4.ip_forward": 1},
             "devices": "/dev/net/tun:/dev/net/tun:rwm"
-        }, 
+        },
     )
 
     return upf_cld
@@ -97,7 +94,7 @@ def instantiate_upf_cld():
 
 def instantiate_upf_mec():
     info("*** Adding Host for open5gs UPF MEC\n")
-    env["COMPONENT_NAME"]="upf_mec"
+    env["COMPONENT_NAME"] = "upf_mec"
     upf_mec = net.addDockerHost(
         "upf_mec",
         dimage="my5gc_v2-4-4",
@@ -129,14 +126,15 @@ def instantiate_upf_mec():
             "devices": "/dev/net/tun:/dev/net/tun:rwm"
         },
     )
-    
+
     return upf_mec
+
 
 def instantiate_mec_server():
     info("*** Adding MEC SERVER\n")
-    env["COMPONENT_NAME"]="mec_server"
+    env["COMPONENT_NAME"] = "mec_server"
     mec_server = net.addDockerHost(
-        "mec_server", 
+        "mec_server",
         dimage="mec_server",
         ip="192.168.0.140/24",
         dcmd="bash /mnt/mec_server/mec_server.sh",
@@ -171,9 +169,9 @@ def instantiate_gnbs(ngNB):
     gnb_list = []
 
     for i in range(1, ngNB+1):
-        env["COMPONENT_NAME"]=f"gnb{i}"
+        env["COMPONENT_NAME"] = f"gnb{i}"
         gnb_list.append(net.addDockerHost(
-            f"gnb{i}", 
+            f"gnb{i}",
             dimage="myueransim_v3-2-6",
             ip=f"192.168.0.{130+i}/24",
             # dcmd="",
@@ -212,9 +210,9 @@ def instantiate_ues(nUE):
     ue_list = []
 
     for i in range(1, nUE+1):
-        env["COMPONENT_NAME"]= f"ue{i}"
+        env["COMPONENT_NAME"] = f"ue{i}"
         ue_list.append(net.addDockerHost(
-            f"ue{i}", 
+            f"ue{i}",
             dimage="myueransim_v3-2-6",
             ip=f"192.168.0.{140+i}/24",
             dcmd=f"bash /mnt/ueransim/open5gs_ue_init.sh {i}",
@@ -242,17 +240,17 @@ def instantiate_ues(nUE):
                 "cap_add": ["NET_ADMIN"],
                 "devices": "/dev/net/tun:/dev/net/tun:rwm"
             },
-        )  )
+        ))
 
-    return ue_list 
-            
+    return ue_list
+
 
 def add_subscribers(nUE):
     ue_configuration.generate_json(nUE)
-    
-    with open( prj_folder + "/python_modules/subscribers.json" , 'r') as f:
-        data = json.load( f )
-    
+
+    with open(prj_folder + "/python_modules/subscribers.json", 'r') as f:
+        data = json.load(f)
+
     if "subscribers" in data:
         subscribers = data["subscribers"]
         n = 0
@@ -261,10 +259,21 @@ def add_subscribers(nUE):
             o5gs.addSubscriber(subscriber)
         info(f"*** Open5GS: Successfuly added {n} subscribers ")
     else:
-        info(f"*** Open5GS: No subscribers found")
+        info("*** Open5GS: No subscribers found")
+
 
 if __name__ == "__main__":
+    if len(sys.argv) <= 1:
+        print("Please, pass the number of UE that you want to generate as parameter")
+        sys.exit(-1)
+
     nUE = int(sys.argv[1])  # Cli parameter
+
+    if nUE <= 0 or nUE > 10:
+        print("Make sure that the number of UE is between 1 and 10")
+        sys.exit(-1)
+
+
     ngNB = math.ceil(nUE/3)
 
     ue_setup.generate_yaml(nUE, ngNB)
@@ -278,7 +287,7 @@ if __name__ == "__main__":
     prj_folder = os.path.dirname(script_path)
 
     homepath = os.getenv("HOME")  # Works only for linux
-    mongodb_folder= f"{homepath}/mongodbdata"
+    mongodb_folder = f"{homepath}/mongodbdata"
 
     env = dict()
 
@@ -300,22 +309,30 @@ if __name__ == "__main__":
     s3 = net.addSwitch("s3")
 
     info("*** Adding links\n")
-    net.addLink(s1,  s2, bw=1000, delay="10ms", intfName1="s1-s2",  intfName2="s2-s1")
-    net.addLink(s2,  s3, bw=1000, delay="50ms", intfName1="s2-s3",  intfName2="s3-s2")
-    
-    net.addLink(cp,      s3, bw=1000, delay="1ms", intfName1="cp-s3",  intfName2="s3-cp")
-    net.addLink(upf_cld, s3, bw=1000, delay="1ms", intfName1="upf_cld-s3",  intfName2="s3-upf_cld")
-    net.addLink(upf_mec, s2, bw=1000, delay="1ms", intfName1="upf_mec-s2", intfName2="s2-upf_mec")
-    
-    for i in range(nUE):
-        net.addLink(ue_list[i],  s1, bw=1000, delay="1ms", intfName1=f"ue{i+1}-s1",  intfName2=f"s1-ue{i+1}")
-    for i in range(ngNB):
-        net.addLink(gnb_list[i], s1, bw=1000, delay="1ms", intfName1=f"gnb{i+1}-s1", intfName2=f"s1-gnb{i+1}")
-    
-    net.addLink(mec_server, s3, bw=1000, delay="5ms", intfName1="mec_server-s3", intfName2="s3-mec_server")
+    net.addLink(s1,  s2, bw=1000, delay="10ms",
+                intfName1="s1-s2",  intfName2="s2-s1")
+    net.addLink(s2,  s3, bw=1000, delay="50ms",
+                intfName1="s2-s3",  intfName2="s3-s2")
 
-    print(f"*** Open5GS: Init subscriber for UE")
-    o5gs   = Open5GS( "172.17.0.2" ,"27017")
+    net.addLink(cp,      s3, bw=1000, delay="1ms",
+                intfName1="cp-s3",  intfName2="s3-cp")
+    net.addLink(upf_cld, s3, bw=1000, delay="1ms",
+                intfName1="upf_cld-s3",  intfName2="s3-upf_cld")
+    net.addLink(upf_mec, s2, bw=1000, delay="1ms",
+                intfName1="upf_mec-s2", intfName2="s2-upf_mec")
+
+    for i in range(nUE):
+        net.addLink(ue_list[i],  s1, bw=1000, delay="1ms",
+                    intfName1=f"ue{i+1}-s1",  intfName2=f"s1-ue{i+1}")
+    for i in range(ngNB):
+        net.addLink(gnb_list[i], s1, bw=1000, delay="1ms",
+                    intfName1=f"gnb{i+1}-s1", intfName2=f"s1-gnb{i+1}")
+
+    net.addLink(mec_server, s3, bw=1000, delay="5ms",
+                intfName1="mec_server-s3", intfName2="s3-mec_server")
+
+    print("*** Open5GS: Init subscriber for UE")
+    o5gs = Open5GS("172.17.0.2", "27017")
     o5gs.removeAllSubscribers()
     add_subscribers(nUE)
 
@@ -323,8 +340,6 @@ if __name__ == "__main__":
     net.start()
 
     if not AUTOTEST_MODE:
-        # spawnXtermDocker("open5gs")
-        # spawnXtermDocker("gnb")
         CLI(net)
 
     net.stop()

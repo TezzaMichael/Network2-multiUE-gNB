@@ -89,7 +89,7 @@ def generate_yaml(nUE, gnNB):
         file.write(yaml)
         file.close()
 
-    return 
+    return
 
 
 if __name__ == '__main__':
