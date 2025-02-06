@@ -405,7 +405,7 @@ def bandwidth(network):
             continue
         
         # Starting the iperf3 server on the current UPF component
-        print("Starting server")
+        print(f"Starting server {upf.name}")
         
         # Kill any existing iperf3 server process (if any)
         command = f"docker exec {upf.name} pkill -2 -f iperf3"
@@ -420,18 +420,20 @@ def bandwidth(network):
         print("Iterating over the list of UE")
         for ue in network.ue_list:
             interface_ip = None
+            interface = None
 
             # Find the IP address for the appropriate UE interface
-            for interface in ue.interfaces:
-                if upf.name == "upf_mec" and interface == "uesimtun1":
-                    interface_ip = get_ip(ue.name, interface)
-                elif upf.name == "upf_cld" and interface == "uesimtun0":
-                    interface_ip = get_ip(ue.name, interface)
-
+            if upf.name == "upf_mec":
+                interface = "uesimtun1"
+            elif upf.name == "upf_cld":
+                interface = "uesimtun0"
+                    
+            interface_ip = ue.interfaces[interface]
             # Skip if no interface IP is found for the current UE
             if not interface_ip:
                 continue
-
+            
+            print(f"## {ue.name}[{interface}] ##")
             # Run the iperf3 bandwidth test from the UE to the UPF
             command = ["docker", "exec", ue.name, "iperf3", "-c", dest_ip, "-B", interface_ip, "-t", "5"]
             result = subprocess.run(command, capture_output=True, text=True)

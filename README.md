@@ -111,10 +111,10 @@ cd ../open5gs
 
 3. Run init.sh with the number of UE
 ```bash
- sudo init.sh nUE
+ sudo ./start_network.sh nUE
 ```
 for example: nUE = 6
 ```bash
- sudo init.sh 6
+ sudo ./start_network.sh 6
 ```
 
