@@ -31,6 +31,9 @@ class Network:
         self.upf_cld = upf_cld
         self.cp = cp
         self.mec_server = mec_server
+    
+    def get_component_list(self):
+        return self.ue_list + self.gnb_list + [self.upf_mec] + [self.upf_cld] + [self.cp] + [self.mec_server]
 
     def __str__(self):
         """Returns a formatted string representation of the network configuration.
@@ -93,6 +96,7 @@ class Component:
             name (str): Name of the component.
         """
         self.name = name
+        self.ip = ""
         self.interfaces = {}  # Dictionary to store interfaces and their IPs
 
     def add_interface(self, interface_name, interface_ip):
@@ -103,7 +107,10 @@ class Component:
             interface_name (str): Name of the interface (e.g., "eth0").
             interface_ip (str): IP address associated with the interface.
         """
-        self.interfaces[interface_name] = interface_ip
+        if self.name in interface_name:
+            self.ip = interface_ip
+        else:
+            self.interfaces[interface_name] = interface_ip
 
     def remove_interface(self, interface_name):
         """
@@ -144,7 +151,7 @@ class Component:
         Returns:
             str: A summary of the component's name and the number of interfaces.
         """
-        return f"Component: {self.name}, Interfaces: {len(self.interfaces)}"
+        return f"Component: {self.name}, Ip: {self.ip}, Interfaces: {len(self.interfaces)}"
 
 def get_network_components(nUE, ngNB):
     """
@@ -255,6 +262,7 @@ def print_tcpdump_output(process, ue):
     """Reads tcpdump output in real-time and prints it."""
     
     try:
+        output = ""
         for line in iter(process.stdout.readline, ''):
             stripped_line = line.strip()  # Remove whitespace and newline characters
             
@@ -262,8 +270,12 @@ def print_tcpdump_output(process, ue):
                 # Check if the specified IP (e.g., 192.168.0.140) is present in the line
                 if ue in stripped_line and "UDP" in stripped_line:
                     print(stripped_line)  # Print only if the IP is found
+                    output += " " + stripped_line
             else:
                 print(stripped_line)  # Print all lines if no UE filter is provided
+                output += " " + stripped_line
+            
+        return output
                 
     except KeyboardInterrupt:
         pass  # Handle interruption gracefully
@@ -360,27 +372,44 @@ def latency(network):
     Args:
         network (Network): The network object containing UEs, UPF Cloud, and UPF MEC components.
     """
-    
+
+    results = []
     # Loop through all UEs in the network
     for ue in network.ue_list:
         print(f"Test latency for {ue.name}")
         
-        # Loop through all interfaces for the current UE
         for interface in ue.interfaces:
-            
-            # If the interface is 'uesimtun0', test latency to UPF Cloud
             if interface == "uesimtun0":
-                print(f"-    interface: {interface}")
-                print("-    upf_cld")
-                # Perform the ping test and print the result
-                print(ping_test(ue.name, interface, network.upf_cld.interfaces["upf_cld-s3"]))
-            
-            # If the interface is 'uesimtun1', test latency to UPF MEC
+                destination = network.upf_cld
             elif interface == "uesimtun1":
-                print(f"-    interface: {interface}")
-                print("-    upf_mec")
-                # Perform the ping test and print the result
-                print(ping_test(ue.name, interface, network.upf_mec.interfaces["upf_mec-s2"]))
+                destination = network.upf_mec
+            else:
+                continue
+
+            print(f"-    interface: {interface}")
+            print(f"-    {destination.name}")
+            # Perform the ping test and print the result
+            ping_output = ping_test(ue.name, interface, destination.ip)
+            result = ""
+            if not ping_output:
+                result = "Error"
+            elif "SO_BINDTODEVICE" in ping_output:
+                result = "Not Found"
+            else:
+                match = re.search(r"(\d+) packets transmitted, (\d+) received", ping_output)
+                if match:
+                    transmitted = int(match.group(1))
+                    received = int(match.group(2))
+                    result = f"{received}/{transmitted}"
+                else: 
+                    result = "Error"
+
+            results.append((f"{ue.name}[{interface}]", destination.name, result))
+            
+            print(ping_output)
+
+    field_names = ["From", "To", "Result"] 
+    print_table(field_names, results, True)
 
 def bandwidth(network):
     """
@@ -397,17 +426,7 @@ def bandwidth(network):
 
     # Iterate over the UPF components (MEC and Cloud)
     for upf in [network.upf_mec, network.upf_cld]:
-        dest_ip = None
-        
-        # Find the IP address for the UPF interface
-        for interface in upf.interfaces:
-            if interface.startswith("upf"):
-                dest_ip = get_ip(upf.name, interface)
-        
-        # Skip if no valid destination IP is found
-        if dest_ip is None:
-            continue
-        
+       
         # Starting the iperf3 server on the current UPF component
         print(f"Starting server {upf.name}")
         
@@ -440,7 +459,7 @@ def bandwidth(network):
             
             print(f"## {ue.name}[{interface}] ##")
             # Run the iperf3 bandwidth test from the UE to the UPF
-            command = ["docker", "exec", ue.name, "iperf3", "-c", dest_ip, "-B", interface_ip, "-t", "5"]
+            command = ["docker", "exec", ue.name, "iperf3", "-c", upf.ip, "-B", interface_ip, "-t", "5"]
             result = subprocess.run(command, capture_output=True, text=True)
 
             # Process and print the result of the bandwidth test
@@ -482,6 +501,8 @@ def routing(network):
     
     ngNB = len(network.gnb_list)  # Get the number of gNBs in the network
     
+    results= [] 
+
     # Iterate through all User Equipment (UE) in the network
     for ue in network.ue_list:
         match = re.search(r'(\d+)', ue.name)  # Extract the number from the UE's name
@@ -500,7 +521,7 @@ def routing(network):
         time.sleep(2)  # Wait for tcpdump to start
         
         # Print tcpdump output for the current UE
-        print_tcpdump_output(process, ue.interfaces[f"{ue.name}-s1"])
+        print_tcpdump_output(process, ue.ip)
         stop_tcpdump(process)  # Stop tcpdump after capturing traffic
         
         # Iterate through the interfaces of the current UE to simulate routing
@@ -522,7 +543,7 @@ def routing(network):
             # Simulate routing via UPF MEC for "uesimtun1" interface
             elif interface == "uesimtun1":
                 print(f"### Check routing {ue.name} -> {gnb} -> upf_mec ###")
-                destination = network.mec_server.interfaces["mec_server-s3"]  # Get MEC server IP
+                destination = network.mec_server.ip  # Get MEC server IP
                 upf = "upf_mec"
                 routing = f"Routing: {ue.name}[{interface}] -> {gnb} -> {upf} -> mec_server"
             
@@ -536,7 +557,7 @@ def routing(network):
             
             # Display tcpdump output for the selected UPF
             print(f"### Output tcpdump {upf} ###")
-            print_tcpdump_output(process1, None)
+            process_output = print_tcpdump_output(process1, None)
             
             # Stop tcpdump after completing the test
             print(f"### Stopping tcpdump {upf} ###")
@@ -546,6 +567,19 @@ def routing(network):
             print(routing)
             time.sleep(2)  # Sleep before proceeding to the next test
 
+            # Parse output to print in the table 
+            captured_match = re.search(r'(\d+) packets captured', process_output)
+            captured = int(captured_match.group(1)) if captured_match else None
+
+            received_match = re.search(r'(\d+) packets received by filter', process_output)
+            received = int(received_match.group(1)) if received_match else None
+
+            routing = routing.replace("Routing: ", "")
+            results.append((routing, f"{captured}/{received}"))
+
+    field_names = ["Routing", "Result"] 
+    print_table(field_names, results, True)
+
 def details(network):
     """
     Prints the details of the entire network configuration, including UEs, gNBs, UPFs, and the MEC server.
@@ -554,8 +588,14 @@ def details(network):
         network (Network): The network object containing all components (UEs, gNBs, UPFs, and MEC server).
     """
     print(network)  # Print the full network details (invokes the __str__ method of the Network class)
+    field_names = ["Component name", "ip", "interfaces"]
+    result = []
 
-
+    for component in network.get_component_list():
+        interfaces = " ".join([f"{name}:{ip}" for name, ip in component.interfaces.items()])
+        result.append((component.name, component.ip, interfaces))
+    print_table(field_names, result, True)
+    
 def print_table(field_names, rows, clear_screen=False):
     """
     Prints a table on the screen representing the user provided informations

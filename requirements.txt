@@ -1,0 +1,4 @@
+comnetsemu==0.3.1
+mininet==2.3.1b1
+prettytable==3.14.0
+pymongo==4.11
