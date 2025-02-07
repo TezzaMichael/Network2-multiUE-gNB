@@ -5,6 +5,8 @@ import re
 import time
 import argparse
 import textwrap
+import os
+from prettytable import PrettyTable
 
 
 class Network:
@@ -391,6 +393,8 @@ def bandwidth(network):
         network (Network): The network object containing UEs, UPF Cloud, and UPF MEC components.
     """
     
+    results = []
+
     # Iterate over the UPF components (MEC and Cloud)
     for upf in [network.upf_mec, network.upf_cld]:
         dest_ip = None
@@ -418,6 +422,7 @@ def bandwidth(network):
 
         # Iterate over the list of UEs to run bandwidth tests
         print("Iterating over the list of UE")
+
         for ue in network.ue_list:
             interface_ip = None
             interface = None
@@ -446,12 +451,24 @@ def bandwidth(network):
                 if line.startswith("[ ID]"):
                     break
 
-            print("".join(reversed(final_result)))
-        
+            result = "".join(reversed(final_result))
+            print(result)
+
+            # Regular expression to match the bitrate (Mbits/sec)
+            bitrate_pattern = r'(\d+\.\d+) Mbits/sec'
+            # Find all matches
+            bitrate_matches = re.findall(bitrate_pattern, result)
+
+            results.append((upf.name, ue.name, *bitrate_matches))
+
+
         # Stop the iperf3 server after the tests
         print("Stopping the server")
         command = f"docker exec {upf.name} pkill -2 -f iperf3"
         subprocess.run(command, shell=True, universal_newlines=True)
+    
+    field_names = ["Server", "Host", "H->S (Mbits/sec)", "S->H (Mbits/sec)"]
+    print_table(field_names, results, True)
 
 def routing(network):
     """
@@ -538,6 +555,31 @@ def details(network):
     """
     print(network)  # Print the full network details (invokes the __str__ method of the Network class)
 
+
+def print_table(field_names, rows, clear_screen=False):
+    """
+    Prints a table on the screen representing the user provided informations
+
+    Args:
+        field_names (list): List containing the headers of the table 
+        rows (list): List containing the values to display
+        clear_srceen (bool): should the function clear the previous outputs on the terminal?
+    """
+    # Print the results in a table for better readability
+    table = PrettyTable()
+    table.field_names = field_names
+
+    # Add the data to the table
+    for row in rows:
+        if len(row) == len(table.field_names):
+            table.add_row(row)
+    
+    if clear_screen:
+        os.system("clear")  
+
+    print(table)
+
+
 def main():
     """
     Main function that handles command-line arguments, sets up the network components, 
@@ -607,6 +649,7 @@ def main():
     
     # Execute the selected command with the network object
     command_function(network)
+
 
 if __name__ == '__main__':
     main()
