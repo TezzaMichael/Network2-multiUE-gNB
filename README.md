@@ -17,8 +17,7 @@ The goal is to simulate a flexible and scalable 5G network that adapts to differ
 ### 1. **Dynamic UE and gNB Allocation**  
 - The user specifies the desired number of UEs as an input.  
 - The system calculates the number of gNBs required based on the rule:
- **Number of gNBs** = ⌈Number of UEs / 3⌉
- (where `⌈x⌉` represents rounding up).  
+ **Number of gNBs** = math.ceil(Number of UEs / 3)
 
  For example:
  5 UEs → 2 gNBs (3 UEs on the first gNB, 2 on the second).  
@@ -52,7 +51,7 @@ The simulated network includes the following components:
 
 2. **gNB Calculation**:  
  The script computes the required number of gNBs using the formula:
- **Number of gNBs** = ⌈Number of UEs / 3⌉
+ **Number of gNBs** = math.ceil(Number of UEs / 3)
 
 3. **Network Creation**:  
 - The system creates the necessary gNBs and UEs.  
@@ -83,10 +82,18 @@ Once configured, the 5G network simulation runs in **Communetsemu**, enabling pe
 - **Scalability**: The system can handle various scales, making it suitable for testing large and small networks.  
 
 ---
-## Prerequisites
+
+## **Prerequisites**
 
 - Comnetsemu [[link](https://git.comnets.net/public-repo/comnetsemu)]
 - PyMongo
+
+Before running the project, install the required dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+---
 
 ## **Getting Started**  
 
@@ -109,12 +116,31 @@ cd ../open5gs
 ./dockerhub_pull.sh
 ```
 
-3. Run init.sh with the number of UE
+3. Run `init.sh` with the number of UE:
 ```bash
- sudo ./start_network.sh nUE
+sudo ./start_network.sh nUE
 ```
-for example: nUE = 6
+For example, if `nUE = 6`:
 ```bash
- sudo ./start_network.sh 6
+sudo ./start_network.sh 6
+```
+
+---
+
+## **Testing**  
+
+To run performance tests, use the following command:
+```bash
+sudo python3 ./test.py -c <arg>
+```
+where `<arg>` can be one of the following:
+- `details`: Provides a detailed overview of the network.
+- `latency`: Measures network latency.
+- `bandwidth`: Evaluates bandwidth performance.
+- `routing`: Analyzes network routing.
+
+For help, run:
+```bash
+sudo python3 ./test.py -h
 ```
 
